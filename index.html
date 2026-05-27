@@ -290,7 +290,7 @@
       // Button Handler - simulates dual-hand interaction
       function handleButtonClick() {
         if (state === "IDLE" || state === "STOPPED") {
-          // Simulate pressing both hands down
+          // Simulate pressing both hands down to start new session
           leftTouched = true;
           rightTouched = true;
           leftZone.classList.add("active");
@@ -309,7 +309,15 @@
           // Simulate pressing both hands down to stop
           leftTouched = true;
           rightTouched = true;
+          leftZone.classList.add("active");
+          rightZone.classList.add("active");
           checkState();
+
+          // Reset hands after stopping so state is clean for next session
+          leftTouched = false;
+          rightTouched = false;
+          leftZone.classList.remove("active");
+          rightZone.classList.remove("active");
         }
       }
 
