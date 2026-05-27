@@ -68,6 +68,38 @@
         font-variant-numeric: tabular-nums; /* Keeps numbers from shifting */
       }
 
+      @keyframes timerStop {
+        0% {
+          transform: scale(1);
+          color: white;
+          text-shadow: 0 0 0px rgba(68, 255, 68, 0);
+        }
+        25% {
+          transform: scale(1.05);
+          color: #44ff44;
+          text-shadow: 0 0 30px rgba(68, 255, 68, 0.8);
+        }
+        50% {
+          transform: scale(1.02);
+          color: #44ff44;
+          text-shadow: 0 0 50px rgba(68, 255, 68, 0.6);
+        }
+        75% {
+          transform: scale(1.04);
+          color: #44ff44;
+          text-shadow: 0 0 40px rgba(68, 255, 68, 0.7);
+        }
+        100% {
+          transform: scale(1);
+          color: white;
+          text-shadow: 0 0 20px rgba(68, 255, 68, 0.3);
+        }
+      }
+
+      .time.stopped {
+        animation: timerStop 0.8s ease-out;
+      }
+
       /* Touch Zones */
       .touch-zones {
         position: absolute;
@@ -228,6 +260,9 @@
             redLight.classList.add("red-on");
             greenLight.classList.remove("green-on");
 
+            // Clear stop animation for new session
+            timeEl.classList.remove("stopped");
+
             prepareTimeout = setTimeout(() => {
               if (state === "PREPARING" && leftTouched && rightTouched) {
                 state = "READY";
@@ -263,6 +298,12 @@
             previousTime = finalTime;
             previousTimeEl.textContent = formatTime(previousTime);
             startStopBtn.textContent = "START";
+
+            // Trigger stop animation
+            timeEl.classList.remove("stopped");
+            // Force reflow to restart animation
+            void timeEl.offsetWidth;
+            timeEl.classList.add("stopped");
           }
         }
       }
@@ -303,6 +344,8 @@
             rightTouched = false;
             leftZone.classList.remove("active");
             rightZone.classList.remove("active");
+            // Clear stop animation for new session
+            timeEl.classList.remove("stopped");
             checkState();
           }, 600);
         } else if (state === "RUNNING") {
