@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>iPad Speedcube Timer</title>
+  <style>
+    /* Reset and lock the screen for iPad */
+    body, html {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      background-color: #1a1a1a;
+      color: white;
+      font-family: 'Courier New', Courier, monospace;
+      overflow: hidden;
+      touch-action: none; /* Prevents pull-to-refresh and swiping */
+      -webkit-user-select: none; /* Prevents text selection on long press */
+      user-select: none;
+    }
+
+    .container {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      justify-content: center;
+      align-items: center;
+      position: relative;
+    }
+
+    /* Status Lights */
+    .lights {
+      display: flex;
+      gap: 30px;
+      margin-bottom: 20px;
+      z-index: 10;
+      pointer-events: none;
+    }
+
+    .light {
+      width: 25px;
+      height: 25px;
+      border-radius: 50%;
+      background: #333;
+      transition: background 0.1s;
+    }
+
+    .light.red-on {
+      background: #ff4444;
+      box-shadow: 0 0 20px #ff4444;
+    }
+
+    .light.green-on {
+      background: #44ff44;
+      box-shadow: 0 0 20px #44ff44;
+    }
+
+    /* Timer Display */
+    .time {
+      font-size: 18vw;
+      font-weight: bold;
+      z-index: 10;
+      pointer-events: none;
+      font-variant-numeric: tabular-nums; /* Keeps numbers from shifting */
+    }
+
+    /* Touch Zones */
+    .touch-zones {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      z-index: 5;
+    }
+
+    .zone {
+      flex: 1;
+      height: 100%;
+      background: rgba(255, 255, 255, 0.02);
+      border-left: 1px solid rgba(255, 255, 255, 0.05);
+      border-right: 1px solid rgba(255, 255, 255, 0.05);
+      transition: background 0.1s;
+    }
+
+    .zone.active {
+      background: rgba(255, 255, 255, 0.08);
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <div class="lights">
+      <div id="redLight" class="light"></div>
+      <div id="greenLight" class="light"></div>
+    </div>
+    <div id="time" class="time">0.000</div>
+  </div>
+
+  <div class="touch-zones">
+    <div id="leftZone" class="zone"></div>
+    <div id="rightZone" class="zone"></div>
+  </div>
+
+  <script>
+    const timeEl = document.getElementById('time');
+    const redLight = document.getElementById('redLight');
+    const greenLight = document.getElementById('greenLight');
+    const leftZone = document.getElementById('leftZone');
+    const rightZone = document.getElementById('rightZone');
+
+    // Timer variables
+    let state = 'IDLE'; // States: IDLE, PREPARING, READY, RUNNING, STOPPED
+    let leftTouched = false;
+    let rightTouched = false;
+    let prepareTimeout = null;
+    let startTime = 0;
+    let finalTime = 0;
+
+    // Format milliseconds into M:SS.mmm or SS.mmm
+    function formatTime(ms) {
+      let totalSeconds = ms / 1000;
+      let minutes = Math.floor(totalSeconds / 60);
+      let seconds = Math.floor(totalSeconds % 60);
+      let milliseconds = Math.floor((totalSeconds % 1) * 1000);
+
+      let secStr = seconds.toString();
+      let msStr = milliseconds.toString().padStart(3, '0');
+
+      if (minutes > 0) {
+        secStr = secStr.padStart(2, '0');
+        return `${minutes}:${secStr}.${msStr}`;
+      }
+      return `${secStr}.${msStr}`;
+    }
+
+    function updateDisplay(ms) {
+      timeEl.textContent = formatTime(ms);
+    }
+
+    // Timer Loop
+    function updateTimer() {
+      if (state === 'RUNNING') {
+        updateDisplay(Date.now() - startTime);
+        requestAnimationFrame(updateTimer); // Highly efficient screen repaint
+      }
+    }
+
+    // Core Logic State Machine
+    function checkState() {
+      const bothHandsDown = leftTouched && rightTouched;
+
+      if (state === 'IDLE' || state === 'STOPPED') {
+        if (bothHandsDown) {
+          // Both hands placed down: Start 0.5s inspection delay
+          state = 'PREPARING';
+          updateDisplay(0); 
+          redLight.classList.add('red-on');
+          greenLight.classList.remove('green-on');
+          
+          prepareTimeout = setTimeout(() => {
+            if (state === 'PREPARING' && leftTouched && rightTouched) {
+              state = 'READY';
+              redLight.classList.remove('red-on');
+              greenLight.classList.add('green-on');
+            }
+          }, 500); // 500ms hold required
+        }
+      } 
+      else if (state === 'PREPARING') {
+        if (!bothHandsDown) {
+          // Hand lifted too early: Abort
+          clearTimeout(prepareTimeout);
+          state = 'IDLE';
+          redLight.classList.remove('red-on');
+        }
+      } 
+      else if (state === 'READY') {
+        if (!bothHandsDown) {
+          // Hand lifted after green light: Start timer!
+          state = 'RUNNING';
+          redLight.classList.remove('red-on');
+          greenLight.classList.remove('green-on');
+          startTime = Date.now();
+          requestAnimationFrame(updateTimer);
+        }
+      } 
+      else if (state === 'RUNNING') {
+        if (bothHandsDown) {
+          // Both hands placed down while running: Stop timer!
+          state = 'STOPPED';
+          finalTime = Date.now() - startTime;
+          updateDisplay(finalTime);
+        }
+      }
+    }
+
+    // Touch Event Handlers
+    function handleTouch(e, isLeft) {
+      e.preventDefault(); // Prevents iPad scrolling/zooming
+      const isTouching = e.targetTouches.length > 0;
+      
+      if (isLeft) {
+        leftTouched = isTouching;
+        isTouching ? leftZone.classList.add('active') : leftZone.classList.remove('active');
+      } else {
+        rightTouched = isTouching;
+        isTouching ? rightZone.classList.add('active') : rightZone.classList.remove('active');
+      }
+      
+      checkState();
+    }
+
+    // Attach listeners to left zone
+    leftZone.addEventListener('touchstart', (e) => handleTouch(e, true), {passive: false});
+    leftZone.addEventListener('touchend', (e) => handleTouch(e, true), {passive: false});
+    leftZone.addEventListener('touchcancel', (e) => handleTouch(e, true), {passive: false});
+
+    // Attach listeners to right zone
+    rightZone.addEventListener('touchstart', (e) => handleTouch(e, false), {passive: false});
+    rightZone.addEventListener('touchend', (e) => handleTouch(e, false), {passive: false});
+    rightZone.addEventListener('touchcancel', (e) => handleTouch(e, false), {passive: false});
+
+    // Optional Spacebar support for testing on a computer
+    window.addEventListener('keydown', (e) => {
+      if (e.code === 'Space' && !e.repeat) {
+        leftTouched = true; rightTouched = true;
+        leftZone.classList.add('active'); rightZone.classList.add('active');
+        checkState();
+      }
+    });
+    window.addEventListener('keyup', (e) => {
+      if (e.code === 'Space') {
+        leftTouched = false; rightTouched = false;
+        leftZone.classList.remove('active'); rightZone.classList.remove('active');
+        checkState();
+      }
+    });
+  </script>
+</body>
+</html>
